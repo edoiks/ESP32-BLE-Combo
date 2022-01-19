@@ -1,13 +1,14 @@
 #ifndef ESP32_BLE_COMBO_KEYBOARD_H
 #define ESP32_BLE_COMBO_KEYBOARD_H
 #include "sdkconfig.h"
-#if defined(CONFIG_BT_ENABLED)
 
 #include "BleConnectionStatus.h"
 #include "BLEHIDDevice.h"
 #include "BLECharacteristic.h"
+#include <BLEServer.h>
 #include "Print.h"
-
+#include "BleCombo.h"
+#include "BLE2902.h"
 
 const uint8_t KEY_LEFT_CTRL = 0x80;
 const uint8_t KEY_LEFT_SHIFT = 0x81;
@@ -77,7 +78,6 @@ const MediaKeyReport KEY_MEDIA_WWW_BACK = {0, 32};
 const MediaKeyReport KEY_MEDIA_CONSUMER_CONTROL_CONFIGURATION = {0, 64}; // Media Selection
 const MediaKeyReport KEY_MEDIA_EMAIL_READER = {0, 128};
 
-
 //  Low level key report: up to 6 keys and shift, ctrl etc at once
 typedef struct
 {
@@ -86,23 +86,36 @@ typedef struct
   uint8_t keys[6];
 } KeyReport;
 
-class BleComboKeyboard : public Print
+class BleComboKeyboard : public Print, public HIDInputDevice
 {
 private:
-  BleConnectionStatus* connectionStatus;
-  BLEHIDDevice* hid;
-  BLECharacteristic* inputKeyboard;
-  BLECharacteristic* outputKeyboard;
+  uint8_t id;
+  BLECharacteristic* inputDev;
+  BLECharacteristic* outputDev;
   BLECharacteristic* inputMediaKeys;
   
-  KeyReport _keyReport;
-  MediaKeyReport _mediaKeyReport;
-  static void taskServer(void* pvParameter);
+  KeyReport keyReport;
+  MediaKeyReport mediaKeyReport;
 
 public:
-  BleComboKeyboard(std::string deviceName = "ESP32 Keyboard/Mouse", std::string deviceManufacturer = "Espressif", uint8_t batteryLevel = 100);
+  BleComboKeyboard();
   void begin(void);
   void end(void);
+  virtual void notify()
+  {
+    inputDev->notify();
+  };
+  virtual void createInputDev(BleComboInput*);
+  virtual void setId(uint8_t value)
+  {
+    id = value;
+  };
+  virtual uint8_t getId()
+  {
+    return id;
+  };
+  virtual const uint8_t* getDescriptor();
+  virtual size_t getSizeOfDescriptor();
   void sendReport(KeyReport* keys);
   void sendReport(MediaKeyReport* keys);
   size_t press(uint8_t k);
@@ -112,17 +125,25 @@ public:
   size_t write(uint8_t c);
   size_t write(const MediaKeyReport c);
   size_t write(const uint8_t *buffer, size_t size);
-  
-  void releaseAll(void);
-  bool isConnected(void);
-  void setBatteryLevel(uint8_t level);
-  uint8_t batteryLevel;
-  std::string deviceManufacturer;
-  std::string deviceName;
 
-  BLECharacteristic* inputMouse;
+  void releaseAll(void);
+  
+  virtual void disconnect()
+  {
+    BLE2902* desc = (BLE2902*)inputDev->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(true);
+    desc = (BLE2902*)inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(true);
+  }
+  
+  virtual void connect()
+  {
+    BLE2902* desc = (BLE2902*)inputDev->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(false);
+    desc = (BLE2902*)inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
+    desc->setNotifications(false);
+  }
 
 };
 
-#endif // CONFIG_BT_ENABLED
 #endif // ESP32_BLE_COMBO_KEYBOARD_H

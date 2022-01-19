@@ -1,22 +1,31 @@
 #include "BleConnectionStatus.h"
 
-BleConnectionStatus::BleConnectionStatus(void) {
+BleConnectionStatus::BleConnectionStatus(HIDInputDevice** in, unsigned* count)
+{
+    devices = in;    
+    devCount = count;
 }
 
 void BleConnectionStatus::onConnect(BLEServer* pServer)
 {
   this->connected = true;
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902*)this->inputMouse->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
+  for (unsigned i=0; i<*devCount; i++)
+  {
+    if (devices[i] != nullptr)
+    {
+        devices[i]->connect();
+    }
+  }
 }
 
 void BleConnectionStatus::onDisconnect(BLEServer* pServer)
 {
   this->connected = false;
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902*)this->inputMouse->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);  
+  for (unsigned i=0; i<*devCount; i++)
+  {
+    if (devices[i] != nullptr)
+    {
+        devices[i]->disconnect();
+    }
+  }
 }

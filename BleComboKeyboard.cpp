@@ -23,9 +23,8 @@
 // Report IDs:
 #define KEYBOARD_ID 0x01
 #define MEDIA_KEYS_ID 0x02
-#define MOUSE_ID 0x03
 
-static const uint8_t _hidReportDescriptor[] = {
+static const uint8_t keyboardhidReportDescriptor[] = {
   USAGE_PAGE(1),      0x01,          // USAGE_PAGE (Generic Desktop Ctrls)
   USAGE(1),           0x06,          // USAGE (Keyboard)
   COLLECTION(1),      0x01,          // COLLECTION (Application)
@@ -87,132 +86,46 @@ static const uint8_t _hidReportDescriptor[] = {
   USAGE(2),           0x83, 0x01,    //   Usage (Media sel)   ; bit 6: 64
   USAGE(2),           0x8A, 0x01,    //   Usage (Mail)        ; bit 7: 128
   HIDINPUT(1),        0x02,          //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  END_COLLECTION(0),                 // END_COLLECTION
-
-  // ------------------------------------------------- Mouse
-  USAGE_PAGE(1),       0x01, // USAGE_PAGE (Generic Desktop)
-  USAGE(1),            0x02, // USAGE (Mouse)
-  COLLECTION(1),       0x01, // COLLECTION (Application)
-  USAGE(1),            0x01, //   USAGE (Pointer)
-  COLLECTION(1),       0x00, //   COLLECTION (Physical)
-  REPORT_ID(1),        MOUSE_ID, //     REPORT_ID (1)
-  // ------------------------------------------------- Buttons (Left, Right, Middle, Back, Forward)
-  USAGE_PAGE(1),       0x09, //     USAGE_PAGE (Button)
-  USAGE_MINIMUM(1),    0x01, //     USAGE_MINIMUM (Button 1)
-  USAGE_MAXIMUM(1),    0x05, //     USAGE_MAXIMUM (Button 5)
-  LOGICAL_MINIMUM(1),  0x00, //     LOGICAL_MINIMUM (0)
-  LOGICAL_MAXIMUM(1),  0x01, //     LOGICAL_MAXIMUM (1)
-  REPORT_SIZE(1),      0x01, //     REPORT_SIZE (1)
-  REPORT_COUNT(1),     0x05, //     REPORT_COUNT (5)
-  HIDINPUT(1),         0x02, //     INPUT (Data, Variable, Absolute) ;5 button bits
-  // ------------------------------------------------- Padding
-  REPORT_SIZE(1),      0x03, //     REPORT_SIZE (3)
-  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
-  HIDINPUT(1),         0x03, //     INPUT (Constant, Variable, Absolute) ;3 bit padding
-  // ------------------------------------------------- X/Y position, Wheel
-  USAGE_PAGE(1),       0x01, //     USAGE_PAGE (Generic Desktop)
-  USAGE(1),            0x30, //     USAGE (X)
-  USAGE(1),            0x31, //     USAGE (Y)
-  USAGE(1),            0x38, //     USAGE (Wheel)
-  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
-  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
-  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8)
-  REPORT_COUNT(1),     0x03, //     REPORT_COUNT (3)
-  HIDINPUT(1),         0x06, //     INPUT (Data, Variable, Relative) ;3 bytes (X,Y,Wheel)
-  // ------------------------------------------------- Horizontal wheel
-  USAGE_PAGE(1),       0x0c, //     USAGE PAGE (Consumer Devices)
-  USAGE(2),      0x38, 0x02, //     USAGE (AC Pan)
-  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
-  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
-  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8)
-  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
-  HIDINPUT(1),         0x06, //     INPUT (Data, Var, Rel)
-  END_COLLECTION(0),         //   END_COLLECTION
-  END_COLLECTION(0)          // END_COLLECTION
+  END_COLLECTION(0)                 // END_COLLECTION
 };
 
-BleComboKeyboard::BleComboKeyboard(std::string deviceName, std::string deviceManufacturer, uint8_t batteryLevel) : hid(0)
+BleComboKeyboard::BleComboKeyboard() 
 {
-  this->deviceName = deviceName;
-  this->deviceManufacturer = deviceManufacturer;
-  this->batteryLevel = batteryLevel;
-  this->connectionStatus = new BleConnectionStatus();
 }
 
 void BleComboKeyboard::begin(void)
 {
-  xTaskCreate(this->taskServer, "server", 20000, (void *)this, 5, NULL);
 }
 
 void BleComboKeyboard::end(void)
 {
 }
 
-bool BleComboKeyboard::isConnected(void) {
-  return this->connectionStatus->connected;
+const uint8_t* BleComboKeyboard::getDescriptor()
+{
+    return keyboardhidReportDescriptor;
 }
 
-void BleComboKeyboard::setBatteryLevel(uint8_t level) {
-  this->batteryLevel = level;
-  if (hid != 0)
-    this->hid->setBatteryLevel(this->batteryLevel);
-}
-
-void BleComboKeyboard::taskServer(void* pvParameter) {
-  BleComboKeyboard* bleKeyboardInstance = (BleComboKeyboard *) pvParameter; //static_cast<BleComboKeyboard *>(pvParameter);
-  BLEDevice::init(bleKeyboardInstance->deviceName);
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(bleKeyboardInstance->connectionStatus);
-
-  bleKeyboardInstance->hid = new BLEHIDDevice(pServer);
-  bleKeyboardInstance->inputKeyboard = bleKeyboardInstance->hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
-  bleKeyboardInstance->outputKeyboard = bleKeyboardInstance->hid->outputReport(KEYBOARD_ID);
-  bleKeyboardInstance->inputMediaKeys = bleKeyboardInstance->hid->inputReport(MEDIA_KEYS_ID);
-  bleKeyboardInstance->connectionStatus->inputKeyboard = bleKeyboardInstance->inputKeyboard;
-  bleKeyboardInstance->connectionStatus->outputKeyboard = bleKeyboardInstance->outputKeyboard;
-  
-  bleKeyboardInstance->inputMouse = bleKeyboardInstance->hid->inputReport(MOUSE_ID); // <-- input REPORTID from report map
-  bleKeyboardInstance->connectionStatus->inputMouse = bleKeyboardInstance->inputMouse;
- 
-  bleKeyboardInstance->outputKeyboard->setCallbacks(new KeyboardOutputCallbacks());
-
-  bleKeyboardInstance->hid->manufacturer()->setValue(bleKeyboardInstance->deviceManufacturer);
-
-  bleKeyboardInstance->hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
-  bleKeyboardInstance->hid->hidInfo(0x00,0x01);
-
-  BLESecurity *pSecurity = new BLESecurity();
-
-  pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND);
-
-  bleKeyboardInstance->hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
-  bleKeyboardInstance->hid->startServices();
-
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->setAppearance(HID_KEYBOARD);
-  pAdvertising->addServiceUUID(bleKeyboardInstance->hid->hidService()->getUUID());
-  pAdvertising->start();
-  bleKeyboardInstance->hid->setBatteryLevel(bleKeyboardInstance->batteryLevel);
-
-  ESP_LOGD(LOG_TAG, "Advertising started!");
-  vTaskDelay(portMAX_DELAY); //delay(portMAX_DELAY);
-}
+size_t BleComboKeyboard::getSizeOfDescriptor()
+{
+  return sizeof(keyboardhidReportDescriptor);
+};
 
 void BleComboKeyboard::sendReport(KeyReport* keys)
 {
-  if (this->isConnected())
+  if (isConnected())
   {
-    this->inputKeyboard->setValue((uint8_t*)keys, sizeof(KeyReport));
-    this->inputKeyboard->notify();
+    inputDev->setValue((uint8_t*)keys, sizeof(KeyReport));
+    inputDev->notify();
   }
 }
 
 void BleComboKeyboard::sendReport(MediaKeyReport* keys)
 {
-  if (this->isConnected())
+  if (isConnected())
   {
-    this->inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaKeyReport));
-    this->inputMediaKeys->notify();
+    inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaKeyReport));
+    inputMediaKeys->notify();
   }
 }
 
@@ -366,7 +279,7 @@ size_t BleComboKeyboard::press(uint8_t k)
 	if (k >= 136) {			// it's a non-printing key (not a modifier)
 		k = k - 136;
 	} else if (k >= 128) {	// it's a modifier key
-		_keyReport.modifiers |= (1<<(k-128));
+		keyReport.modifiers |= (1<<(k-128));
 		k = 0;
 	} else {				// it's a printing key
 		k = pgm_read_byte(_asciimap + k);
@@ -375,20 +288,20 @@ size_t BleComboKeyboard::press(uint8_t k)
 			return 0;
 		}
 		if (k & 0x80) {						// it's a capital letter or other character reached with shift
-			_keyReport.modifiers |= 0x02;	// the left shift modifier
+			keyReport.modifiers |= 0x02;	// the left shift modifier
 			k &= 0x7F;
 		}
 	}
 
 	// Add k to the key report only if it's not already present
 	// and if there is an empty slot.
-	if (_keyReport.keys[0] != k && _keyReport.keys[1] != k &&
-		_keyReport.keys[2] != k && _keyReport.keys[3] != k &&
-		_keyReport.keys[4] != k && _keyReport.keys[5] != k) {
+	if (keyReport.keys[0] != k && keyReport.keys[1] != k &&
+		keyReport.keys[2] != k && keyReport.keys[3] != k &&
+		keyReport.keys[4] != k && keyReport.keys[5] != k) {
 
 		for (i=0; i<6; i++) {
-			if (_keyReport.keys[i] == 0x00) {
-				_keyReport.keys[i] = k;
+			if (keyReport.keys[i] == 0x00) {
+				keyReport.keys[i] = k;
 				break;
 			}
 		}
@@ -397,20 +310,20 @@ size_t BleComboKeyboard::press(uint8_t k)
 			return 0;
 		}
 	}
-	sendReport(&_keyReport);
+	sendReport(&keyReport);
 	return 1;
 }
 
 size_t BleComboKeyboard::press(const MediaKeyReport k)
 {
     uint16_t k_16 = k[1] | (k[0] << 8);
-    uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
+    uint16_t mediaKeyReport_16 = mediaKeyReport[1] | (mediaKeyReport[0] << 8);
 
     mediaKeyReport_16 |= k_16;
-    _mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
-    _mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
+    mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
+    mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
 
-	sendReport(&_mediaKeyReport);
+	sendReport(&mediaKeyReport);
 	return 1;
 }
 
@@ -423,7 +336,7 @@ size_t BleComboKeyboard::release(uint8_t k)
 	if (k >= 136) {			// it's a non-printing key (not a modifier)
 		k = k - 136;
 	} else if (k >= 128) {	// it's a modifier key
-		_keyReport.modifiers &= ~(1<<(k-128));
+		keyReport.modifiers &= ~(1<<(k-128));
 		k = 0;
 	} else {				// it's a printing key
 		k = pgm_read_byte(_asciimap + k);
@@ -431,7 +344,7 @@ size_t BleComboKeyboard::release(uint8_t k)
 			return 0;
 		}
 		if (k & 0x80) {							// it's a capital letter or other character reached with shift
-			_keyReport.modifiers &= ~(0x02);	// the left shift modifier
+			keyReport.modifiers &= ~(0x02);	// the left shift modifier
 			k &= 0x7F;
 		}
 	}
@@ -439,39 +352,39 @@ size_t BleComboKeyboard::release(uint8_t k)
 	// Test the key report to see if k is present.  Clear it if it exists.
 	// Check all positions in case the key is present more than once (which it shouldn't be)
 	for (i=0; i<6; i++) {
-		if (0 != k && _keyReport.keys[i] == k) {
-			_keyReport.keys[i] = 0x00;
+		if (0 != k && keyReport.keys[i] == k) {
+			keyReport.keys[i] = 0x00;
 		}
 	}
 
-	sendReport(&_keyReport);
+	sendReport(&keyReport);
 	return 1;
 }
 
 size_t BleComboKeyboard::release(const MediaKeyReport k)
 {
     uint16_t k_16 = k[1] | (k[0] << 8);
-    uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
+    uint16_t mediaKeyReport_16 = mediaKeyReport[1] | (mediaKeyReport[0] << 8);
     mediaKeyReport_16 &= ~k_16;
-    _mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
-    _mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
+    mediaKeyReport[0] = (uint8_t)((mediaKeyReport_16 & 0xFF00) >> 8);
+    mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
 
-	sendReport(&_mediaKeyReport);
+	sendReport(&mediaKeyReport);
 	return 1;
 }
 
 void BleComboKeyboard::releaseAll(void)
 {
-	_keyReport.keys[0] = 0;
-	_keyReport.keys[1] = 0;
-	_keyReport.keys[2] = 0;
-	_keyReport.keys[3] = 0;
-	_keyReport.keys[4] = 0;
-	_keyReport.keys[5] = 0;
-	_keyReport.modifiers = 0;
-    _mediaKeyReport[0] = 0;
-    _mediaKeyReport[1] = 0;
-	sendReport(&_keyReport);
+	keyReport.keys[0] = 0;
+	keyReport.keys[1] = 0;
+	keyReport.keys[2] = 0;
+	keyReport.keys[3] = 0;
+	keyReport.keys[4] = 0;
+	keyReport.keys[5] = 0;
+	keyReport.modifiers = 0;
+    mediaKeyReport[0] = 0;
+    mediaKeyReport[1] = 0;
+	sendReport(&keyReport);
 }
 
 size_t BleComboKeyboard::write(uint8_t c)
@@ -501,5 +414,13 @@ size_t BleComboKeyboard::write(const uint8_t *buffer, size_t size) {
 		buffer++;
 	}
 	return n;
+}
+
+void BleComboKeyboard::createInputDev(BleComboInput* handler)
+{
+  inputDev = handler->hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
+  outputDev = handler->hid->outputReport(KEYBOARD_ID);
+  inputMediaKeys = handler->hid->inputReport(MEDIA_KEYS_ID);
+  outputDev->setCallbacks(new KeyboardOutputCallbacks());
 }
 

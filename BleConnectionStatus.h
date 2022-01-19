@@ -4,19 +4,18 @@
 #if defined(CONFIG_BT_ENABLED)
 
 #include <BLEServer.h>
-#include "BLE2902.h"
-#include "BLECharacteristic.h"
+#include "BleCombo.h"
+class HIDInputDevice;
 
 class BleConnectionStatus : public BLEServerCallbacks
 {
 public:
-  BleConnectionStatus(void);
+  BleConnectionStatus(HIDInputDevice** in, unsigned* count);
   bool connected = false;
   void onConnect(BLEServer* pServer);
   void onDisconnect(BLEServer* pServer);
-  BLECharacteristic* inputKeyboard;
-  BLECharacteristic* outputKeyboard;
-  BLECharacteristic* inputMouse;
+  unsigned* devCount;
+  HIDInputDevice** devices;
 };
 
 #endif // CONFIG_BT_ENABLED

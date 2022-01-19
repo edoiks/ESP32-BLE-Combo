@@ -4,8 +4,10 @@
 # Class
 #######################################
 
+BleComboInput KEYWORD1
 BleComboKeyboard	KEYWORD1
 BleComboMouse	KEYWORD1
+BleComboGamepad	KEYWORD1
 
 #######################################
 # Methods and Functions

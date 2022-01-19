@@ -13,6 +13,6 @@ KeyboardOutputCallbacks::KeyboardOutputCallbacks(void) {
 
 void KeyboardOutputCallbacks::onWrite(BLECharacteristic* me) {
   uint8_t* value = (uint8_t*)(me->getValue().c_str());
-  ESP_LOGI(LOG_TAG, "special keys: %d", *value);
+  ESP_LOGI(LOG_TAG, "XXXXXXXXXXXXXX special keys: %d", *value);
 }
 
